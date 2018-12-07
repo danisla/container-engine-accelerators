@@ -48,3 +48,5 @@ push:
 	gcloud docker -- push ${REGISTRY}/${IMAGE}:${TAG}
 
 .PHONY: all format test vet presubmit build container push
+
+include dev.mk

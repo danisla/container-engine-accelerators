@@ -15,6 +15,7 @@
 package nvidia
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
@@ -71,6 +72,7 @@ func (ngm *nvidiaGPUManager) discoverGPUs() error {
 	if err != nil {
 		return err
 	}
+	gpuCount := 0
 	for _, f := range files {
 		if f.IsDir() {
 			continue
@@ -78,6 +80,11 @@ func (ngm *nvidiaGPUManager) discoverGPUs() error {
 		if reg.MatchString(f.Name()) {
 			glog.Infof("Found Nvidia GPU %q\n", f.Name())
 			ngm.devices[f.Name()] = pluginapi.Device{ID: f.Name(), Health: pluginapi.Healthy}
+
+			fakeName := fmt.Sprintf("nvidia%d", 100+gpuCount)
+			ngm.devices[fakeName] = pluginapi.Device{ID: fakeName, Health: pluginapi.Healthy}
+			glog.Infof("Registered fake GPU %s -> %s\n", f.Name(), fakeName)
+			gpuCount++
 		}
 	}
 	return nil
