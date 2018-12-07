@@ -21,6 +21,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"strconv"
 	"sync"
 	"time"
 
@@ -38,7 +39,7 @@ const (
 	// Optional device.
 	nvidiaUVMToolsDevice = "/dev/nvidia-uvm-tools"
 	devDirectory         = "/dev"
-	nvidiaDeviceRE       = `^nvidia[0-9]*$`
+	nvidiaDeviceRE       = `^(nvidia)([0-9]*)$`
 )
 
 var (
@@ -72,19 +73,33 @@ func (ngm *nvidiaGPUManager) discoverGPUs() error {
 	if err != nil {
 		return err
 	}
-	gpuCount := 0
+
+	overprovisionCount := 0
+	overprovisionEnv := os.Getenv("PER_GPU_OVERPROVISION")
+	if len(overprovisionEnv) > 0 {
+		overprovisionCount, err = strconv.Atoi(overprovisionEnv)
+		if err != nil {
+			glog.Errorf("Unable to parse PER_GPU_OVERPROVISION: %v", err)
+		}
+	}
+
 	for _, f := range files {
 		if f.IsDir() {
 			continue
 		}
-		if reg.MatchString(f.Name()) {
-			glog.Infof("Found Nvidia GPU %q\n", f.Name())
-			ngm.devices[f.Name()] = pluginapi.Device{ID: f.Name(), Health: pluginapi.Healthy}
+		if toks := reg.FindStringSubmatch(f.Name()); toks != nil {
+			if deviceIndex, _ := strconv.Atoi(toks[2]); deviceIndex < 100 {
+				glog.Infof("Found Nvidia GPU %q\n", f.Name())
+				ngm.devices[f.Name()] = pluginapi.Device{ID: f.Name(), Health: pluginapi.Healthy}
 
-			fakeName := fmt.Sprintf("nvidia%d", 100+gpuCount)
-			ngm.devices[fakeName] = pluginapi.Device{ID: fakeName, Health: pluginapi.Healthy}
-			glog.Infof("Registered fake GPU %s -> %s\n", f.Name(), fakeName)
-			gpuCount++
+				for i := 0; i < overprovisionCount-1; i++ {
+					fakeIndex := (deviceIndex+1)*100 + i
+					fakeName := fmt.Sprintf("%s%d", toks[1], fakeIndex)
+					ngm.devices[fakeName] = pluginapi.Device{ID: fakeName, Health: pluginapi.Healthy}
+					os.Symlink(fmt.Sprintf("/dev/%s", f.Name()), fmt.Sprintf("/dev/%s", fakeName))
+					glog.Infof("Registered fake GPU linking %s -> %s\n", f.Name(), fakeName)
+				}
+			}
 		}
 	}
 	return nil
