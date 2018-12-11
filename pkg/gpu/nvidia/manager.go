@@ -90,9 +90,12 @@ func (ngm *nvidiaGPUManager) discoverGPUs() error {
 		if toks := reg.FindStringSubmatch(f.Name()); toks != nil {
 			if deviceIndex, _ := strconv.Atoi(toks[2]); deviceIndex < 100 {
 				glog.Infof("Found Nvidia GPU %q\n", f.Name())
-				ngm.devices[f.Name()] = pluginapi.Device{ID: f.Name(), Health: pluginapi.Healthy}
 
-				for i := 0; i < overprovisionCount-1; i++ {
+                if overprovisionCount < 1 {
+				    ngm.devices[f.Name()] = pluginapi.Device{ID: f.Name(), Health: pluginapi.Healthy}
+                }
+                
+				for i := 0; i < overprovisionCount; i++ {
 					fakeIndex := (deviceIndex+1)*100 + i
 					fakeName := fmt.Sprintf("%s%d", toks[1], fakeIndex)
 					ngm.devices[fakeName] = pluginapi.Device{ID: fakeName, Health: pluginapi.Healthy}
