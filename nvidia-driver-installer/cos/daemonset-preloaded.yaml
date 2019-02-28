@@ -71,6 +71,16 @@ spec:
             cpu: 0.15
         securityContext:
           privileged: true
+        command: ["/bin/bash"]
+        args:
+        - -c
+        - |
+          # Patch installer to install X11 driver
+          sed -i '/^    --silent \\/a\ \ \ \ --x-prefix="${NVIDIA_INSTALL_DIR_CONTAINER}" \\\n\ \ \ \ --install-libglvnd \\' /entrypoint.sh
+          /entrypoint.sh
+          # Install modeset kernel module for vulkan support
+          insmod /usr/local/nvidia/drivers/nvidia-modeset.ko
+          touch /usr/local/nvidia/driver_install_complete
         env:
           - name: NVIDIA_INSTALL_DIR_HOST
             value: /home/kubernetes/bin/nvidia
